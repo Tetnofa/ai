@@ -1,8 +1,18 @@
 import OpenAI from 'openai'
 import { resolveMediaPrompt } from '@tanstack/ai'
 import { BaseVideoAdapter, snapToDurationOption } from '@tanstack/ai/adapters'
-import { toRunErrorPayload } from '@tanstack/ai/adapter-internals'
-import { arrayBufferToBase64 } from '@tanstack/ai-utils'
+import {
+  toRunErrorPayload,
+  uploadMedia,
+  MEDIA_UPLOADER_REQUIRED,
+} from '@tanstack/ai/adapter-internals'
+import type {
+  MediaUploader,
+  VideoGenerationOptions,
+  VideoJobResult,
+  VideoStatusResult,
+  VideoUrlResult,
+} from '@tanstack/ai'
 import {
   getLovableApiKeyFromEnv,
   openaiRequestOptions,
@@ -16,12 +26,6 @@ import {
   validateVideoSize,
 } from '../video/video-provider-options'
 import type { DurationOptions } from '@tanstack/ai/adapters'
-import type {
-  VideoGenerationOptions,
-  VideoJobResult,
-  VideoStatusResult,
-  VideoUrlResult,
-} from '@tanstack/ai'
 import type OpenAI_SDK from 'openai'
 import type {
   LovableVideoModel,
@@ -36,24 +40,15 @@ import type {
 } from '../video/video-provider-options'
 import type { LovableClientConfig } from '../utils/client'
 
-const LARGE_MEDIA_BUFFER_BYTES = 10 * 1024 * 1024
 const VIDEO_DURATIONS = [
   4, 6, 8,
 ] as const satisfies ReadonlyArray<LovableVideoDuration>
-
-function warnIfLargeMediaBuffer(byteLength: number, source: string): void {
-  if (byteLength <= LARGE_MEDIA_BUFFER_BYTES) return
-  console.warn(
-    `[lovable.${source}] downloaded ${(byteLength / 1024 / 1024).toFixed(1)} MiB into memory before base64 encoding. ` +
-      `Workers/serverless runtimes commonly run out of memory above ~10 MiB. ` +
-      `Consider streaming the video through a CDN or your own storage layer instead.`,
-  )
-}
 
 /**
  * @experimental Video generation is an experimental feature and may change.
  */
 export interface LovableVideoConfig extends LovableClientConfig {
+  mediaUploader?: MediaUploader
   /**
    * Opt into fetching HTTP(S) image URL inputs for `input_reference`.
    * The endpoint requires uploaded file bytes, so an HTTP(S) URL has to be
@@ -84,7 +79,11 @@ export class LovableVideoAdapter<
   constructor(config: LovableVideoConfig, model: TModel) {
     super({}, model)
     this.clientConfig = config
-    const { allowUrlFetch: _allowUrlFetch, ...clientOptions } = config
+    const {
+      allowUrlFetch: _allowUrlFetch,
+      mediaUploader: _mediaUploader,
+      ...clientOptions
+    } = config
     this.client = new OpenAI(withLovableDefaults(clientOptions))
   }
 
@@ -198,12 +197,10 @@ export class LovableVideoAdapter<
         }
       }
 
-      const contentResponse = await this.client.videos.downloadContent(jobId)
-      return dataUrlFromResponse(
-        jobId,
-        contentResponse,
-        'video.downloadContent',
-      )
+      const uploader = this.clientConfig.mediaUploader
+      if (!uploader) return { jobId, url: '', error: MEDIA_UPLOADER_REQUIRED }
+      const response = await this.client.videos.downloadContent(jobId)
+      return { jobId, url: await uploadMedia(response, uploader, 'video/mp4') }
     } catch (error: unknown) {
       if (isHttpStatus(error, 404)) {
         throw new Error(`Video job not found: ${jobId}`)
@@ -245,22 +242,6 @@ export class LovableVideoAdapter<
       default:
         return 'processing'
     }
-  }
-}
-
-async function dataUrlFromResponse(
-  jobId: string,
-  contentResponse: Response,
-  source: string,
-): Promise<VideoUrlResult> {
-  const videoBlob = await contentResponse.blob()
-  const buffer = await videoBlob.arrayBuffer()
-  warnIfLargeMediaBuffer(buffer.byteLength, source)
-  const base64 = arrayBufferToBase64(buffer)
-  const mimeType = contentResponse.headers.get('content-type') || 'video/mp4'
-  return {
-    jobId,
-    url: `data:${mimeType};base64,${base64}`,
   }
 }
 

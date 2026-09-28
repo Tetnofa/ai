@@ -15,12 +15,9 @@ describe('GrokSpeechAdapter', () => {
   const audioBytes = new Uint8Array([1, 2, 3, 4, 5])
 
   function mockTTSResponse() {
-    return {
-      ok: true,
-      status: 200,
-      arrayBuffer: () => Promise.resolve(audioBytes.buffer),
-      text: () => Promise.resolve(''),
-    } as Partial<Response> as Response
+    return new Response(audioBytes, {
+      headers: { 'content-type': 'audio/mpeg' },
+    })
   }
 
   it('posts to {baseURL}/tts with defaults and returns base64 audio', async () => {
@@ -543,4 +540,22 @@ describe('toAudioFile', () => {
     expect(alawFile.type).toBe('audio/x-alaw-basic')
     expect(alawFile.name).toBe('audio.alaw')
   })
+})
+
+it('uploads Grok speech without buffering the response', async () => {
+  const response = new Response(new Uint8Array([1, 2]), {
+    headers: { 'content-type': 'audio/mpeg' },
+  })
+  const read = vi.spyOn(response, 'arrayBuffer')
+  globalThis.fetch = vi.fn().mockResolvedValue(response)
+  const uploader = vi.fn().mockResolvedValue('https://storage.example/grok.mp3')
+  const result = await generateSpeech({
+    adapter: new GrokSpeechAdapter(
+      { apiKey: 'k', mediaUploader: uploader },
+      'grok-tts',
+    ),
+    text: 'Hello',
+  })
+  expect(result.url).toBe('https://storage.example/grok.mp3')
+  expect(read).not.toHaveBeenCalled()
 })

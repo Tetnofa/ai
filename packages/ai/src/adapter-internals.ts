@@ -59,3 +59,11 @@ export {
 } from './utilities/structured-output-events'
 export { tanstackMetadata } from './utilities/merge-metadata'
 export { isSpecTopLevelKey } from './utilities/spec-event-keys'
+
+export {
+  uploadMedia,
+  speechMedia,
+  uploadBase64Media,
+  warnIfLargeMediaBuffer,
+  MEDIA_UPLOADER_REQUIRED,
+} from './utilities/media-upload'

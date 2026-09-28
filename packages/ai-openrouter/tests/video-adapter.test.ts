@@ -32,7 +32,12 @@ function streamOf(bytes: Uint8Array): ReadableStream<Uint8Array> {
 }
 
 const createAdapter = () =>
-  createOpenRouterVideo('bytedance/seedance-2.0', 'test-key')
+  createOpenRouterVideo('bytedance/seedance-2.0', 'test-key', {
+    mediaUploader: async ({ body }) => {
+      await new Response(body).arrayBuffer()
+      return 'https://storage.example/video.mp4'
+    },
+  })
 
 function createMockJobResponse(overrides: Record<string, unknown> = {}) {
   return {
@@ -370,7 +375,7 @@ describe('OpenRouter Video Adapter', () => {
     const CONTENT_URL =
       'https://openrouter.ai/api/v1/videos/job-123/content?index=0'
 
-    it('downloads the content into a data URL with gateway-reported cost', async () => {
+    it('uploads the content with gateway-reported cost', async () => {
       mockGetGeneration = vi.fn().mockResolvedValueOnce(
         createMockJobResponse({
           status: 'completed',
@@ -385,9 +390,7 @@ describe('OpenRouter Video Adapter', () => {
       const result = await adapter.getVideoUrl('job-123')
 
       expect(mockGetVideoContent).toHaveBeenCalledWith({ jobId: 'job-123' })
-      expect(result.url).toBe(
-        `data:video/mp4;base64,${Buffer.from(bytes).toString('base64')}`,
-      )
+      expect(result.url).toBe('https://storage.example/video.mp4')
       expect(result.jobId).toBe('job-123')
       expect(result.usage).toMatchObject({ cost: 0.45 })
     })
@@ -484,4 +487,20 @@ describe('OpenRouter Video Adapter', () => {
       expect(adapter.snapDuration(8)).toBe(10)
     })
   })
+})
+
+it('does not download authenticated video without a mediaUploader', async () => {
+  mockGetGeneration = vi.fn().mockResolvedValue(
+    createMockJobResponse({
+      status: 'completed',
+      unsignedUrls: ['https://openrouter.ai/content'],
+    }),
+  )
+  mockGetVideoContent = vi.fn()
+  const adapter = createOpenRouterVideo('bytedance/seedance-2.0', 'test-key')
+  expect(await adapter.getVideoUrl('job-123')).toMatchObject({
+    url: '',
+    error: expect.stringContaining('mediaUploader'),
+  })
+  expect(mockGetVideoContent).not.toHaveBeenCalled()
 })

@@ -1,19 +1,21 @@
 import OpenAI from 'openai'
 import { BaseTTSAdapter } from '@tanstack/ai/adapters'
-import { toRunErrorPayload } from '@tanstack/ai/adapter-internals'
-import { arrayBufferToBase64, generateId } from '@tanstack/ai-utils'
+import { toRunErrorPayload, speechMedia } from '@tanstack/ai/adapter-internals'
+import { generateId } from '@tanstack/ai-utils'
 import {
   getLovableApiKeyFromEnv,
   openaiRequestOptions,
   withLovableDefaults,
 } from '../utils/client'
-import type { TTSOptions, TTSResult } from '@tanstack/ai'
+import type { TTSOptions, TTSResult, MediaUploader } from '@tanstack/ai'
 import type OpenAI_SDK from 'openai'
 import type { LovableTTSModel } from '../model-meta'
 import type { LovableTTSProviderOptions } from '../audio/tts-provider-options'
 import type { LovableClientConfig } from '../utils/client'
 
-export interface LovableTTSConfig extends LovableClientConfig {}
+export interface LovableTTSConfig extends LovableClientConfig {
+  mediaUploader?: MediaUploader
+}
 
 const CONTENT_TYPES: Record<string, string> = {
   mp3: 'audio/mpeg',
@@ -29,11 +31,14 @@ export class LovableTTSAdapter<
 > extends BaseTTSAdapter<TModel, LovableTTSProviderOptions> {
   readonly name = 'lovable' as const
 
+  private readonly mediaUploader: MediaUploader | undefined
   protected client: OpenAI
 
   constructor(config: LovableTTSConfig, model: TModel) {
     super(model, {})
-    this.client = new OpenAI(withLovableDefaults(config))
+    const { mediaUploader, ...clientConfig } = config
+    this.mediaUploader = mediaUploader
+    this.client = new OpenAI(withLovableDefaults(clientConfig))
   }
 
   async generateSpeech(
@@ -59,15 +64,18 @@ export class LovableTTSAdapter<
         request,
         openaiRequestOptions(options.abortSignal),
       )
-      const arrayBuffer = await response.arrayBuffer()
-      const base64 = arrayBufferToBase64(arrayBuffer)
       const outputFormat = (request.response_format as string) || 'mp3'
       const contentType = CONTENT_TYPES[outputFormat] || 'audio/mpeg'
 
       return {
         id: generateId(this.name),
         model,
-        audio: base64,
+        ...(await speechMedia(
+          response,
+          contentType,
+          this.mediaUploader,
+          options.logger,
+        )),
         format: outputFormat,
         contentType,
       }

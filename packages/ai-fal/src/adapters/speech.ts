@@ -1,16 +1,21 @@
+import { speechMedia } from '@tanstack/ai/adapter-internals'
+import type { InternalLogger } from '@tanstack/ai/adapter-internals'
+import type { MediaUploader, TTSOptions, TTSResult } from '@tanstack/ai'
 import { fal } from '@fal-ai/client'
 import { BaseTTSAdapter } from '@tanstack/ai/adapters'
 import {
-  arrayBufferToBase64,
   configureFalClient,
   extractUrlExtension,
   generateId as utilGenerateId,
 } from '../utils/client'
 import { buildFalUsage, takeBillableUnits } from '../utils/billing'
 import type { OutputType, Result } from '@fal-ai/client'
-import type { TTSOptions, TTSResult } from '@tanstack/ai'
 import type { FalClientConfig } from '../utils/client'
 import type { FalModel, FalModelInput } from '../model-meta'
+
+export interface FalSpeechConfig extends FalClientConfig {
+  mediaUploader?: MediaUploader
+}
 
 /**
  * Provider options for TTS, excluding fields TanStack AI handles.
@@ -40,10 +45,12 @@ export class FalSpeechAdapter<TModel extends FalModel> extends BaseTTSAdapter<
   FalSpeechProviderOptions<TModel>
 > {
   readonly name = 'fal' as const
+  private readonly mediaUploader: MediaUploader | undefined
 
-  constructor(model: TModel, config?: FalClientConfig) {
+  constructor(model: TModel, config?: FalSpeechConfig) {
     super(model, {})
     configureFalClient(config)
+    this.mediaUploader = config?.mediaUploader
   }
 
   async generateSpeech(
@@ -61,7 +68,7 @@ export class FalSpeechAdapter<TModel extends FalModel> extends BaseTTSAdapter<
         input,
         ...(options.abortSignal ? { abortSignal: options.abortSignal } : {}),
       })
-      return await this.transformResponse(result)
+      return await this.transformResponse(result, logger)
     } catch (error) {
       logger.errors('fal.generateSpeech fatal', {
         error,
@@ -91,6 +98,7 @@ export class FalSpeechAdapter<TModel extends FalModel> extends BaseTTSAdapter<
 
   private async transformResponse(
     response: Result<OutputType<TModel>>,
+    logger: InternalLogger,
   ): Promise<TTSResult> {
     const data = response.data as Record<string, unknown>
 
@@ -117,14 +125,23 @@ export class FalSpeechAdapter<TModel extends FalModel> extends BaseTTSAdapter<
     // Fetch the audio and convert to base64 to match TTSResult contract.
     // Using a chunked helper here — spreading Uint8Array into btoa exceeds
     // V8's argument limit (~65k) for any realistic TTS clip.
-    const audioResponse = await fetch(audioUrl)
-    if (!audioResponse.ok) {
-      throw new Error(
-        `Failed to fetch audio from ${audioUrl}: ${audioResponse.status} ${audioResponse.statusText}`,
-      )
+    let base64 = ''
+    if (!this.mediaUploader) {
+      const audioResponse = await fetch(audioUrl)
+      if (!audioResponse.ok) {
+        throw new Error(
+          `Failed to fetch audio from ${audioUrl}: ${audioResponse.status} ${audioResponse.statusText}`,
+        )
+      }
+      base64 = (
+        await speechMedia(
+          audioResponse,
+          contentType || 'audio/mpeg',
+          undefined,
+          logger,
+        )
+      ).audio
     }
-    const arrayBuffer = await audioResponse.arrayBuffer()
-    const base64 = arrayBufferToBase64(arrayBuffer)
 
     // Strip parameters like `; charset=...` from contentType, and only use
     // the URL extension as a fallback when it looks like a real extension.
@@ -144,6 +161,7 @@ export class FalSpeechAdapter<TModel extends FalModel> extends BaseTTSAdapter<
       id: response.requestId || this.generateId(),
       model: this.model,
       audio: base64,
+      ...(this.mediaUploader ? { url: audioUrl } : {}),
       format,
       contentType: contentTypeMime || `audio/${format}`,
       ...(usage ? { usage } : {}),
@@ -153,7 +171,7 @@ export class FalSpeechAdapter<TModel extends FalModel> extends BaseTTSAdapter<
 
 export function falSpeech<TModel extends FalModel>(
   model: TModel,
-  config?: FalClientConfig,
+  config?: FalSpeechConfig,
 ): FalSpeechAdapter<TModel> {
   return new FalSpeechAdapter(model, config)
 }

@@ -1,10 +1,15 @@
+import { speechMedia } from '@tanstack/ai/adapter-internals'
+import type { InternalLogger } from '@tanstack/ai/adapter-internals'
+import type {
+  MediaUploader,
+  AudioGenerationOptions,
+  AudioGenerationResult,
+} from '@tanstack/ai'
 import { BaseAudioAdapter } from '@tanstack/ai/adapters'
 import {
-  arrayBufferToBase64,
   createElevenLabsClient,
   generateId,
   parseOutputFormat,
-  readStreamToArrayBuffer,
 } from '../utils/client'
 import {
   ELEVENLABS_AUDIO_MODELS,
@@ -12,10 +17,6 @@ import {
   isElevenLabsSoundEffectsModel,
 } from '../model-meta'
 import type { ElevenLabsClient } from '@elevenlabs/elevenlabs-js'
-import type {
-  AudioGenerationOptions,
-  AudioGenerationResult,
-} from '@tanstack/ai'
 import type { ElevenLabsClientConfig } from '../utils/client'
 import type {
   ElevenLabsAudioModel,
@@ -107,10 +108,12 @@ export class ElevenLabsAudioAdapter<
 > extends BaseAudioAdapter<TModel, ElevenLabsAudioProviderOptions> {
   readonly name = 'elevenlabs' as const
 
+  private readonly mediaUploader: MediaUploader | undefined
   private readonly client: ElevenLabsClient
 
   constructor(model: TModel, config?: ElevenLabsClientConfig) {
     super(model, config ?? {})
+    this.mediaUploader = config?.mediaUploader
     this.client = createElevenLabsClient(config)
   }
 
@@ -170,7 +173,7 @@ export class ElevenLabsAudioAdapter<
         : {}),
     })
 
-    return this.finalize(stream, outputFormat, options.duration)
+    return this.finalize(stream, outputFormat, options.duration, options.logger)
   }
 
   private async runSoundEffects(
@@ -195,22 +198,27 @@ export class ElevenLabsAudioAdapter<
       ...(sfx.loop != null ? { loop: sfx.loop } : {}),
     })
 
-    return this.finalize(stream, outputFormat, options.duration)
+    return this.finalize(stream, outputFormat, options.duration, options.logger)
   }
 
   private async finalize(
     stream: ReadableStream<Uint8Array>,
     outputFormat: ElevenLabsOutputFormat | undefined,
     duration: number | undefined,
+    logger: InternalLogger,
   ): Promise<AudioGenerationResult> {
-    const buffer = await readStreamToArrayBuffer(stream)
-    const base64 = arrayBufferToBase64(buffer)
     const { contentType } = parseOutputFormat(outputFormat)
+    const media = await speechMedia(
+      stream,
+      contentType,
+      this.mediaUploader,
+      logger,
+    )
     return {
       id: generateId(this.name),
       model: this.model,
       audio: {
-        b64Json: base64,
+        ...(media.url ? { url: media.url } : { b64Json: media.audio }),
         contentType,
         ...(duration != null ? { duration } : {}),
       },

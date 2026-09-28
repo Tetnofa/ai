@@ -1,3 +1,13 @@
+import { uploadBase64Media } from '@tanstack/ai/adapter-internals'
+import type {
+  MediaUploader,
+  GeneratedImage,
+  ImageGenerationOptions,
+  ImageGenerationResult,
+  ImagePart,
+  MediaInputMetadata,
+  ResolvedMediaPrompt,
+} from '@tanstack/ai'
 import {
   fileReferenceFor,
   isFileSource,
@@ -27,14 +37,6 @@ import type {
   GeminiNativeImageProviderOptions,
 } from '../image/image-provider-options'
 import type {
-  GeneratedImage,
-  ImageGenerationOptions,
-  ImageGenerationResult,
-  ImagePart,
-  MediaInputMetadata,
-  ResolvedMediaPrompt,
-} from '@tanstack/ai'
-import type {
   Content,
   GenerateContentConfig,
   GenerateContentResponse,
@@ -49,7 +51,9 @@ import type { GeminiClientConfig } from '../utils/client'
 /**
  * Configuration for Gemini image adapter
  */
-export interface GeminiImageConfig extends GeminiClientConfig {}
+export interface GeminiImageConfig extends GeminiClientConfig {
+  mediaUploader?: MediaUploader
+}
 
 /** Model type for Gemini Image */
 export type GeminiImageModel = GeminiImageModels
@@ -90,10 +94,12 @@ export class GeminiImageAdapter<
     modelInputModalitiesByName: GeminiImageModelInputModalitiesByName
   }
 
+  private readonly mediaUploader: MediaUploader | undefined
   private readonly client: GoogleGenAI
 
   constructor(config: GeminiImageConfig, model: TModel) {
     super(model, config)
+    this.mediaUploader = config.mediaUploader
     this.client = createGeminiClient(config)
   }
 
@@ -154,7 +160,7 @@ export class GeminiImageAdapter<
         config,
       })
 
-      return this.transformImagenResponse(model, response)
+      return await this.transformImagenResponse(model, response)
     } catch (error) {
       logger.errors('gemini.generateImage fatal', {
         error,
@@ -217,7 +223,7 @@ export class GeminiImageAdapter<
       config,
     })
 
-    return this.transformGeminiResponse(model, response)
+    return await this.transformGeminiResponse(model, response)
   }
 
   /**
@@ -289,10 +295,10 @@ export class GeminiImageAdapter<
     }
   }
 
-  private transformGeminiResponse(
+  private async transformGeminiResponse(
     model: string,
     response: GenerateContentResponse,
-  ): ImageGenerationResult {
+  ): Promise<ImageGenerationResult> {
     const images: Array<GeneratedImage> = []
     const textParts: Array<string> = []
     const parts = response.candidates?.[0]?.content?.parts ?? []
@@ -303,7 +309,17 @@ export class GeminiImageAdapter<
         typeof part.inlineData.data === 'string' &&
         part.inlineData.data.length > 0
       ) {
-        images.push({ b64Json: part.inlineData.data })
+        images.push(
+          this.mediaUploader
+            ? {
+                url: await uploadBase64Media(
+                  part.inlineData.data,
+                  part.inlineData.mimeType || 'image/png',
+                  this.mediaUploader,
+                ),
+              }
+            : { b64Json: part.inlineData.data },
+        )
       } else if (typeof part.text === 'string' && part.text.length > 0) {
         textParts.push(part.text)
       }
@@ -403,10 +419,10 @@ export class GeminiImageAdapter<
     }
   }
 
-  private transformImagenResponse(
+  private async transformImagenResponse(
     model: string,
     response: GenerateImagesResponse,
-  ): ImageGenerationResult {
+  ): Promise<ImageGenerationResult> {
     const entries = response.generatedImages ?? []
     const images: Array<GeneratedImage> = []
     const filterReasons: Array<string> = []
@@ -415,7 +431,15 @@ export class GeminiImageAdapter<
       const b64Json = item.image?.imageBytes
       if (b64Json) {
         images.push({
-          b64Json,
+          ...(this.mediaUploader
+            ? {
+                url: await uploadBase64Media(
+                  b64Json,
+                  item.image?.mimeType || 'image/png',
+                  this.mediaUploader,
+                ),
+              }
+            : { b64Json }),
           ...(item.enhancedPrompt !== undefined && {
             revisedPrompt: item.enhancedPrompt,
           }),

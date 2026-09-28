@@ -15,6 +15,12 @@ Currently supported:
 - **Google Gemini**: Lyria 3 Pro and Lyria 3 Clip music generation
 - **fal.ai**: MiniMax Music, DiffRhythm, Google Lyria 2, Stable Audio 2.5, MMAudio, ElevenLabs sound effects, Thinksound, and more
 
+## Host ElevenLabs audio
+
+Large music or sound-effect responses can exhaust memory when converted to base64. Pass `mediaUploader` in the `elevenlabsAudio` configuration to store the response stream.
+
+Use the [stream uploader contract](./video-generation#host-downloaded-video). The result carries `audio.url`, its content type, and the requested duration. Without an uploader, ElevenLabs returns `audio.b64Json`.
+
 ## Basic Usage
 
 ### Google Lyria (Music)

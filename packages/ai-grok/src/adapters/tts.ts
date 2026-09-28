@@ -1,6 +1,7 @@
+import { speechMedia } from '@tanstack/ai/adapter-internals'
+import type { MediaUploader, TTSOptions, TTSResult } from '@tanstack/ai'
 import { BaseTTSAdapter } from '@tanstack/ai/adapters'
-import { arrayBufferToBase64, generateId, getGrokApiKeyFromEnv } from '../utils'
-import type { TTSOptions, TTSResult } from '@tanstack/ai'
+import { generateId, getGrokApiKeyFromEnv } from '../utils'
 import type { GrokTTSModel } from '../model-meta'
 import type {
   GrokTTSCodec,
@@ -17,6 +18,7 @@ const DEFAULT_GROK_BASE_URL = 'https://api.x.ai/v1'
  * is a minimal subset suitable for direct `fetch` calls.
  */
 export interface GrokSpeechConfig {
+  mediaUploader?: MediaUploader
   apiKey: string
   baseURL?: string
   /** Additional headers to merge into every request (e.g., test IDs). */
@@ -34,12 +36,14 @@ export class GrokSpeechAdapter<
 > extends BaseTTSAdapter<TModel, GrokTTSProviderOptions> {
   readonly name = 'grok' as const
 
+  private readonly mediaUploader: MediaUploader | undefined
   private readonly apiKey: string
   private readonly baseURL: string
   private readonly defaultHeaders: Record<string, string>
 
   constructor(config: GrokSpeechConfig, model: TModel) {
     super(model, config)
+    this.mediaUploader = config.mediaUploader
     this.apiKey = config.apiKey
     this.baseURL = (config.baseURL ?? DEFAULT_GROK_BASE_URL).replace(/\/+$/, '')
     this.defaultHeaders = config.defaultHeaders ?? {}
@@ -84,13 +88,15 @@ export class GrokSpeechAdapter<
         )
       }
 
-      const arrayBuffer = await response.arrayBuffer()
-      const audio = arrayBufferToBase64(arrayBuffer)
-
       return {
         id: generateId(this.name),
         model,
-        audio,
+        ...(await speechMedia(
+          response,
+          getContentType(codec, sampleRateForContentType),
+          this.mediaUploader,
+          logger,
+        )),
         format: codec,
         contentType: getContentType(codec, sampleRateForContentType),
       }

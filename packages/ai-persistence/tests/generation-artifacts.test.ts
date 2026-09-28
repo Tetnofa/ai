@@ -1586,3 +1586,34 @@ describe('artifact URL fetching', () => {
     expect(init?.redirect).toBe('manual')
   })
 })
+
+it('persists hosted speech URLs and replaces them with the durable serve URL', async () => {
+  const persistence = memoryPersistence()
+  const adapter = speechAdapter('mp3')
+  adapter.generateSpeech = vi.fn(async () => ({
+    id: 'speech',
+    model: adapter.model,
+    audio: '',
+    url: 'https://storage.example/speech.mp3',
+    format: 'mp3',
+    contentType: 'audio/mpeg',
+  }))
+  const artifactFetch = vi.fn(async () => new Response('spoken-words'))
+  const result = await generateSpeech({
+    adapter,
+    text: 'Hello',
+    threadId: 'hosted-speech',
+    runId: 'hosted-speech-run',
+    middleware: [
+      withGenerationPersistence(persistence, {
+        threadId: 'hosted-speech',
+        artifactFetch,
+        artifactUrl: (ref) => `/artifacts/${ref.artifactId}`,
+      }),
+    ],
+  })
+  expect(artifactFetch).toHaveBeenCalledOnce()
+  expect(result.artifacts).toHaveLength(1)
+  expect(result.artifacts?.[0]?.mimeType).toBe('audio/mpeg')
+  expect(result.url).toBe(`/artifacts/${result.artifacts?.[0]?.artifactId}`)
+})

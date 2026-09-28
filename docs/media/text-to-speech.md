@@ -26,6 +26,42 @@ Text-to-speech (TTS) is handled by TTS adapters that follow the same tree-shakea
 
 Most providers here ship a fixed catalog of voices. When none of them fit, [create your own](./voice-creation) and pass the new voice ID as `voice`. On a provider whose catalog is per-account, `listVoices()` reads back what is available.
 
+## Host speech output
+
+Large speech responses can exhaust memory when converted to base64. Set `mediaUploader` to send the response stream to storage:
+
+```typescript
+import { generateSpeech } from '@tanstack/ai'
+import { openaiSpeech } from '@tanstack/ai-openai'
+import { mediaUploader } from './storage'
+
+const result = await generateSpeech({
+  adapter: openaiSpeech('gpt-4o-audio-preview', { mediaUploader }),
+  text: 'Your audio is ready.',
+})
+
+console.log(result.url)
+```
+
+Use the [stream uploader contract](./video-generation#host-downloaded-video) for your storage integration. Speech adapters for OpenAI, Lovable, Groq, Grok, and ElevenLabs accept this option. With the option set, fal speech passes through its public upstream URL without a download or upload.
+
+With hosted output, `result.url` contains the public URL and `result.audio` is an empty string. Without an uploader, `result.audio` remains base64. The same fields reach generation hooks through JSON or SSE.
+
+Choose the source before playback:
+
+```typescript
+import type { TTSResult } from '@tanstack/ai'
+
+export function playSpeech(result: TTSResult) {
+  const src = result.url ?? `data:${result.contentType ?? 'audio/mpeg'};base64,${result.audio}`
+  return new Audio(src).play()
+}
+```
+
+ElevenLabs timestamp responses contain base64 in JSON; the SDK buffers these before the uploader receives a Blob. The uploader preserves alignment and segments. ElevenLabs rejects automatic PCM-to-WAV wrapping with an uploader because the WAV header requires the final byte count. Choose MP3 or an explicit PCM `outputFormat`.
+
+The shared base64 fallback warns above 10 MiB through your configured logger. `debug: false` disables that warning.
+
 ## Basic Usage
 
 ### OpenAI Text-to-Speech

@@ -186,3 +186,33 @@ describe('elevenlabsAudio adapter — unknown model', () => {
     expect(errorsSpy).toHaveBeenCalled()
   })
 })
+
+it.each(['music_v1', 'eleven_text_to_sound_v2'] as const)(
+  'uploads %s audio streams and preserves metadata',
+  async (model) => {
+    const stream = makeStream(new Uint8Array([1, 2, 3]))
+    composeMock.mockResolvedValue(stream)
+    sfxConvertMock.mockResolvedValue(stream)
+    const uploader = vi
+      .fn()
+      .mockResolvedValue('https://storage.example/audio.mp3')
+    const result = await elevenlabsAudio(model, {
+      apiKey: 'k',
+      mediaUploader: uploader,
+    }).generateAudio({
+      model,
+      prompt: 'Birdsong',
+      duration: 5,
+      logger: makeLogger(),
+    })
+    expect(result.audio).toEqual({
+      url: 'https://storage.example/audio.mp3',
+      contentType: 'audio/mpeg',
+      duration: 5,
+    })
+    expect(uploader).toHaveBeenCalledWith({
+      body: stream,
+      contentType: 'audio/mpeg',
+    })
+  },
+)

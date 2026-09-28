@@ -1,7 +1,18 @@
+import {
+  uploadBase64Media,
+  toRunErrorPayload,
+} from '@tanstack/ai/adapter-internals'
+import type {
+  MediaUploader,
+  GeneratedImage,
+  ImageGenerationOptions,
+  ImageGenerationResult,
+  ImagePart,
+  MediaInputMetadata,
+} from '@tanstack/ai'
 import OpenAI from 'openai'
 import { resolveMediaPrompt } from '@tanstack/ai'
 import { BaseImageAdapter } from '@tanstack/ai/adapters'
-import { toRunErrorPayload } from '@tanstack/ai/adapter-internals'
 import { buildImagesUsage } from '@tanstack/openai-base'
 import { generateId } from '@tanstack/ai-utils'
 import { getOpenAIApiKeyFromEnv } from '../utils/client'
@@ -11,13 +22,6 @@ import {
   validateNumberOfImages,
   validatePrompt,
 } from '../image/image-provider-options'
-import type {
-  GeneratedImage,
-  ImageGenerationOptions,
-  ImageGenerationResult,
-  ImagePart,
-  MediaInputMetadata,
-} from '@tanstack/ai'
 import type OpenAI_SDK from 'openai'
 import type { OpenAIImageModel } from '../model-meta'
 import type {
@@ -44,6 +48,7 @@ const EDIT_MAX_IMAGES: Record<OpenAIImageModel, number> = {
  * Configuration for OpenAI image adapter
  */
 export interface OpenAIImageConfig extends OpenAIClientConfig {
+  mediaUploader?: MediaUploader
   /**
    * Opt into fetching HTTP(S) image URL inputs for image edits. OpenAI's
    * `/images/edits` endpoint requires uploaded file bytes (no URL
@@ -80,13 +85,36 @@ export class OpenAIImageAdapter<
   readonly name = 'openai' as const
 
   protected client: OpenAI
+  private readonly mediaUploader: MediaUploader | undefined
   private readonly allowUrlFetch: boolean
 
   constructor(config: OpenAIImageConfig, model: TModel) {
     super(model, {})
-    const { allowUrlFetch, ...clientOptions } = config
+    const { allowUrlFetch, mediaUploader, ...clientOptions } = config
+    this.mediaUploader = mediaUploader
     this.client = new OpenAI(clientOptions)
     this.allowUrlFetch = allowUrlFetch ?? false
+  }
+
+  private async uploadImages(
+    images: Array<GeneratedImage>,
+    format: string,
+  ): Promise<Array<GeneratedImage>> {
+    const uploader = this.mediaUploader
+    if (!uploader) return images
+    const uploaded: Array<GeneratedImage> = []
+    for (const image of images) {
+      if (!image.b64Json) {
+        uploaded.push(image)
+        continue
+      }
+      const { b64Json, ...metadata } = image
+      uploaded.push({
+        ...metadata,
+        url: await uploadBase64Media(b64Json, `image/${format}`, uploader),
+      })
+    }
+    return uploaded
   }
 
   async generateImages(
@@ -182,7 +210,14 @@ export class OpenAIImageAdapter<
       return {
         id: generateId(this.name),
         model,
-        images,
+        images: await this.uploadImages(
+          images,
+          modelOptions &&
+            'output_format' in modelOptions &&
+            typeof modelOptions.output_format === 'string'
+            ? modelOptions.output_format
+            : 'png',
+        ),
         ...(usage ? { usage } : {}),
       }
     } catch (error: unknown) {
@@ -308,7 +343,14 @@ export class OpenAIImageAdapter<
       return {
         id: generateId(this.name),
         model,
-        images,
+        images: await this.uploadImages(
+          images,
+          modelOptions &&
+            'output_format' in modelOptions &&
+            typeof modelOptions.output_format === 'string'
+            ? modelOptions.output_format
+            : 'png',
+        ),
         ...(() => {
           const usage = buildImagesUsage(response.usage)
           return usage ? { usage } : {}

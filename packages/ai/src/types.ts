@@ -2337,6 +2337,8 @@ export interface VideoStatusResult {
  * @experimental Video generation is an experimental feature and may change.
  */
 export interface VideoUrlResult {
+  /** Reason no public URL is available. In this case url is empty. */
+  error?: string
   /** Job identifier */
   jobId: string
   /** URL to the generated video */
@@ -2637,8 +2639,10 @@ export interface TTSResult {
   id: string
   /** Model used for generation */
   model: string
-  /** Base64-encoded audio data */
+  /** Base64-encoded audio data. Empty when url is present. */
   audio: string
+  /** Public URL when a mediaUploader hosts the generated audio. */
+  url?: string
   /** Audio format of the generated audio */
   format: string
   /** Duration of the audio file in seconds, if available */

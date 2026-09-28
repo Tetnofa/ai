@@ -850,6 +850,7 @@ export interface SpeechRequestCompletedEvent extends BaseEventContext {
   provider: string
   model: string
   audio: string
+  url?: string
   format: string
   duration: number
   audioDuration?: number

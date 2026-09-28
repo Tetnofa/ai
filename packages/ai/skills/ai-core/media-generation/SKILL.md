@@ -1270,3 +1270,14 @@ and piping into a custom logger.
   returns unexpected output or fails mid-stream, toggle `debug: true` on
   any `generate*()` call to see request metadata, raw provider chunks, and
   errors. Covers per-category toggling and piping into pino/winston.
+
+## Host generated media
+
+Configure `mediaUploader` on OpenAI/Lovable/OpenRouter video, OpenAI/Lovable/Groq/Grok/ElevenLabs speech, ElevenLabs audio, or OpenAI/Gemini image adapters. The callback accepts `{ body: ReadableStream<Uint8Array> | Blob, contentType: string }` and returns a public HTTP(S) URL. Its type is `MediaUploader` from `@tanstack/ai`. Stream into storage with backpressure; do not call `arrayBuffer()` in the uploader.
+
+- Video: public upstream URLs pass through. Without one or an uploader, `getVideoUrl()` returns `{ jobId, url: '', error }` without downloading. `getVideoJobStatus()` surfaces that as a failed status; streaming generation emits `RUN_ERROR`.
+- Speech: hosted output has `url` and empty `audio`. Render `result.url ?? dataUrlFromBase64(result.audio)`. Without an uploader, `audio` is still base64. fal speech with `mediaUploader` passes its upstream URL through.
+- Image and audio generation: hosted output has `url` instead of `b64Json`. Inline image and timestamped speech JSON is already buffered by the SDK.
+- ElevenLabs automatic PCM-to-WAV wrapping cannot stream with an uploader. Use MP3 or an explicit PCM `outputFormat`.
+
+The app supplies storage. Native Files API handles are private provider references and are not interchangeable with public playback URLs. See `docs/media/video-generation.md#host-downloaded-video` and `docs/media/text-to-speech.md#host-speech-output`.

@@ -356,6 +356,7 @@ async function runGenerateSpeech<
       provider: adapter.name,
       model,
       audio: result.audio,
+      ...(result.url ? { url: result.url } : {}),
       format: result.format,
       audioDuration: result.duration,
       contentType: result.contentType,

@@ -494,3 +494,75 @@ describe('elevenlabsSpeech listVoices', () => {
     ])
   })
 })
+
+it.each([false, true])(
+  'uploads ElevenLabs speech streams (dialogue=%s)',
+  async (dialogue) => {
+    const stream = makeStream(new Uint8Array([1, 2, 3]))
+    convertMock.mockResolvedValue(stream)
+    dialogueConvertMock.mockResolvedValue(stream)
+    const uploader = vi
+      .fn()
+      .mockResolvedValue('https://storage.example/speech.mp3')
+    const adapter = elevenlabsSpeech('eleven_v3', {
+      apiKey: 'k',
+      mediaUploader: uploader,
+    })
+    const result = await adapter.generateSpeech({
+      model: 'eleven_v3',
+      text: 'Hello',
+      voice: 'voice-1',
+      logger: makeLogger(),
+      ...(dialogue ? { turns: [{ text: 'Hello', voice: 'voice-1' }] } : {}),
+    })
+    expect(result).toMatchObject({
+      audio: '',
+      url: 'https://storage.example/speech.mp3',
+      format: 'mp3',
+    })
+    expect(uploader).toHaveBeenCalledWith({
+      body: stream,
+      contentType: 'audio/mpeg',
+    })
+  },
+)
+
+it('uploads timestamped speech without dropping alignment', async () => {
+  convertWithTimestampsMock.mockResolvedValue({
+    audioBase64: 'AQID',
+    alignment: {
+      characters: ['a'],
+      characterStartTimesSeconds: [0],
+      characterEndTimesSeconds: [1],
+    },
+  })
+  const adapter = elevenlabsSpeech('eleven_v3', {
+    apiKey: 'k',
+    mediaUploader: async () => 'https://storage.example/speech.mp3',
+  })
+  const result = await adapter.generateSpeech({
+    model: 'eleven_v3',
+    text: 'a',
+    voice: 'v',
+    timestamps: true,
+    logger: makeLogger(),
+  })
+  expect(result.url).toBe('https://storage.example/speech.mp3')
+  expect(result.alignment?.endSeconds).toEqual([1])
+})
+
+it('rejects buffering PCM for WAV when a streaming uploader is configured', async () => {
+  const adapter = elevenlabsSpeech('eleven_v3', {
+    apiKey: 'k',
+    mediaUploader: async () => 'https://storage.example/speech.wav',
+  })
+  await expect(
+    adapter.generateSpeech({
+      model: 'eleven_v3',
+      text: 'a',
+      voice: 'v',
+      format: 'wav',
+      logger: makeLogger(),
+    }),
+  ).rejects.toThrow('wrap PCM as WAV')
+})

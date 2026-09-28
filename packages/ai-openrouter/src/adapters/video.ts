@@ -6,7 +6,20 @@ import {
   unsupportedFileSourceError,
 } from '@tanstack/ai'
 import { BaseVideoAdapter, snapToDurationOption } from '@tanstack/ai/adapters'
-import { arrayBufferToBase64 } from '@tanstack/ai-utils'
+import {
+  uploadMedia,
+  MEDIA_UPLOADER_REQUIRED,
+} from '@tanstack/ai/adapter-internals'
+import type {
+  MediaUploader,
+  ImagePart,
+  MediaInputMetadata,
+  TokenUsage,
+  VideoGenerationOptions,
+  VideoJobResult,
+  VideoStatusResult,
+  VideoUrlResult,
+} from '@tanstack/ai'
 import { getOpenRouterApiKeyFromEnv } from '../utils/client'
 import {
   getVideoDurationOptions,
@@ -31,15 +44,6 @@ import type {
   VideoGenerationRequestResolution,
   VideoGenerationResponse,
 } from '@openrouter/sdk/models'
-import type {
-  ImagePart,
-  MediaInputMetadata,
-  TokenUsage,
-  VideoGenerationOptions,
-  VideoJobResult,
-  VideoStatusResult,
-  VideoUrlResult,
-} from '@tanstack/ai'
 import type { OpenRouterClientConfig } from '../utils/client'
 
 /**
@@ -47,23 +51,8 @@ import type { OpenRouterClientConfig } from '../utils/client'
  *
  * @experimental Video generation is an experimental feature and may change.
  */
-export interface OpenRouterVideoConfig extends OpenRouterClientConfig {}
-
-/**
- * Threshold for emitting a "this download will probably OOM serverless
- * runtimes" warning. Anything larger than this (in bytes) gets surfaced via
- * console.warn — workers and small isolates routinely run out of memory once
- * a downloaded video is base64-encoded.
- */
-const LARGE_MEDIA_BUFFER_BYTES = 10 * 1024 * 1024
-
-function warnIfLargeMediaBuffer(byteLength: number): void {
-  if (byteLength <= LARGE_MEDIA_BUFFER_BYTES) return
-  console.warn(
-    `[openrouter.video] downloaded ${(byteLength / 1024 / 1024).toFixed(1)} MiB into memory before base64 encoding. ` +
-      `Workers/serverless runtimes commonly run out of memory above ~10 MiB. ` +
-      `Consider streaming the video through a CDN or your own storage layer instead.`,
-  )
+export interface OpenRouterVideoConfig extends OpenRouterClientConfig {
+  mediaUploader?: MediaUploader
 }
 
 /**
@@ -243,12 +232,15 @@ export class OpenRouterVideoAdapter<
   override readonly kind = 'video' as const
   readonly name = 'openrouter' as const
 
+  private readonly mediaUploader: MediaUploader | undefined
   private readonly client: OpenRouter
 
   constructor(config: OpenRouterVideoConfig, model: TModel) {
     super({}, model)
+    const { mediaUploader, ...clientConfig } = config
+    this.mediaUploader = mediaUploader
     this.client = new OpenRouter({
-      ...config,
+      ...clientConfig,
       apiKey: config.apiKey,
       serverURL: config.baseURL,
     })
@@ -362,11 +354,10 @@ export class OpenRouterVideoAdapter<
       )
     }
 
-    // `unsigned_urls` require the OpenRouter `Authorization` header
-    // (verified live: a plain GET returns 401), so they cannot go straight
-    // into a browser `<video>` tag. Download through the SDK and return a
-    // data URL instead. `@openrouter/sdk` 0.13.20's `getVideoContent`
-    // accepts `video/mp4` and streams the bytes.
+    const uploader = this.mediaUploader
+    if (!uploader) return { jobId, url: '', error: MEDIA_UPLOADER_REQUIRED }
+
+    // unsigned_urls require authentication, so host the bytes before playback.
     let stream: ReadableStream<Uint8Array>
     try {
       stream = await this.client.videoGeneration.getVideoContent({ jobId })
@@ -376,15 +367,10 @@ export class OpenRouterVideoAdapter<
         `openrouter: failed to download video content for job ${jobId}: ${detail}`,
       )
     }
-    const buffer = await new Response(stream).arrayBuffer()
-    warnIfLargeMediaBuffer(buffer.byteLength)
-    const base64 = arrayBufferToBase64(buffer)
-    const mimeType = 'video/mp4'
-
     const usage = buildVideoUsage(response.usage)
     return {
       jobId,
-      url: `data:${mimeType};base64,${base64}`,
+      url: await uploadMedia(stream, uploader, 'video/mp4'),
       ...(usage ? { usage } : {}),
     }
   }

@@ -1,3 +1,4 @@
+export type { MediaUploader, MediaUploadInput } from './media-uploader'
 // Activity functions - individual exports for each activity
 export {
   chat,

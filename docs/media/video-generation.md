@@ -63,6 +63,62 @@ Currently supported:
 > [keep the finished clip](../persistence/keep-generated-files) by saving its
 > bytes to your own storage.
 
+## Host downloaded video
+
+Large video downloads can exhaust a serverless runtime's memory. Pass `mediaUploader` to store the response stream and return a public URL.
+
+```typescript
+import { getVideoJobStatus } from '@tanstack/ai'
+import type { MediaUploader } from '@tanstack/ai'
+import { openaiVideo } from '@tanstack/ai-openai'
+import { putMedia, publicMediaUrl } from './storage'
+
+const mediaUploader: MediaUploader = async ({ body, contentType }) => {
+  const key = crypto.randomUUID()
+  await putMedia(key, body, { contentType })
+  return publicMediaUrl(key)
+}
+
+export async function GET(request: Request) {
+  const jobId = new URL(request.url).searchParams.get('jobId')
+  if (!jobId) return new Response('jobId is required', { status: 400 })
+
+  const result = await getVideoJobStatus({
+    adapter: openaiVideo('sora-2-pro', { mediaUploader }),
+    jobId,
+  })
+  return Response.json(result)
+}
+```
+
+`putMedia` and `publicMediaUrl` are your storage integration. `putMedia` must consume the stream with backpressure. `publicMediaUrl` returns its public HTTP(S) URL. Calling `arrayBuffer()` in the uploader still buffers the entire video.
+
+The browser receives a URL that it can play:
+
+```typescript
+export async function showVideo(jobId: string, video: HTMLVideoElement) {
+  const response = await fetch(`/api/video?jobId=${encodeURIComponent(jobId)}`)
+  if (!response.ok) throw new Error('Video request failed')
+  const result: unknown = await response.json()
+  if (typeof result !== 'object' || result === null) return
+  if ('error' in result && typeof result.error === 'string') {
+    throw new Error(result.error)
+  }
+  if ('url' in result && typeof result.url === 'string') {
+    video.src = result.url
+  }
+}
+```
+
+The same option is available on `lovableVideo` and `openRouterVideo`.
+
+- Public upstream URLs pass through without an upload.
+- Without a public upstream URL or uploader, the adapter does not download the video. `getVideoJobStatus()` returns `status: 'failed'` with an error that asks for `mediaUploader`.
+- Direct `adapter.getVideoUrl()` calls return an empty `url` and an `error` for this case. Streaming generation emits `RUN_ERROR`.
+- OpenRouter's unsigned video URLs require authentication, so OpenRouter video downloads require an uploader.
+
+The uploader receives `{ body, contentType }`. `body` is a `ReadableStream<Uint8Array>` or a `Blob` for SDKs that already return one. Upload failures propagate; they do not trigger a base64 fallback. A provider Files API handle is not a public playback URL.
+
 ## Basic Usage
 
 ### Creating a Video Job

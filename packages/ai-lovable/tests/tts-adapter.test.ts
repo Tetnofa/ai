@@ -61,3 +61,28 @@ describe('Lovable TTS adapter', () => {
     expect(result.contentType).toBe('audio/mpeg')
   })
 })
+
+it('uploads Lovable speech without reading the response into memory', async () => {
+  const uploader = vi
+    .fn()
+    .mockResolvedValue('https://storage.example/speech.mp3')
+  const adapter = new TestLovableTTSAdapter(
+    { apiKey: 'k', mediaUploader: uploader },
+    'openai/gpt-4o-mini-tts',
+  )
+  const response = new Response(new Uint8Array([1, 2]), {
+    headers: { 'content-type': 'audio/mpeg' },
+  })
+  const read = vi.spyOn(response, 'arrayBuffer')
+  adapter.spyOnSpeechCreate().mockResolvedValue(response)
+  const result = await adapter.generateSpeech({
+    model: 'openai/gpt-4o-mini-tts',
+    text: 'Hello',
+    logger: testLogger,
+  })
+  expect(result).toMatchObject({
+    audio: '',
+    url: 'https://storage.example/speech.mp3',
+  })
+  expect(read).not.toHaveBeenCalled()
+})

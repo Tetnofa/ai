@@ -1154,7 +1154,8 @@ function builtInArtifactDescriptors(
 
   if (activity === 'tts') {
     const audio = stringField(output, 'audio')
-    if (audio) {
+    const url = stringField(output, 'url')
+    if (audio || url) {
       const format = stringField(output, 'format')
       descriptors.push({
         role: 'output',
@@ -1163,7 +1164,7 @@ function builtInArtifactDescriptors(
         mimeType:
           stringField(output, 'contentType') ??
           (format ? `audio/${format}` : 'audio/mpeg'),
-        bytes: base64ToUint8Array(audio),
+        ...(url ? { url } : { bytes: base64ToUint8Array(audio ?? '') }),
       })
     }
   }
@@ -1646,8 +1647,8 @@ async function persistGenerationArtifacts(
  * Rewrite the live result's media fields to each output ref's durable serve URL
  * (`ref.url`), so the live result matches what a reload restores. Keyed off the
  * ref's `source.path`: `images.<i>` → `result.images[i].url`, `video` →
- * `result.url`, `audio` (object) → `result.audio.url`. tts (a base64 string) and
- * transcription (json) have no media-URL field, so they are left as-is; their
+ * `result.url`, `audio` (object) → `result.audio.url`. Hosted tts uses `result.url`. Base64 tts and
+ * transcription (json) are left as-is; their
  * durable bytes are reachable via `result.artifacts`. A no-op when no ref has a
  * `url`.
  */
@@ -1668,6 +1669,8 @@ function applyDurableMediaUrls(
         next = { ...next, images: cloned }
       }
     } else if (path === 'video') {
+      next = { ...next, url: ref.url }
+    } else if (path === 'audio' && typeof next.url === 'string') {
       next = { ...next, url: ref.url }
     } else if (path === 'audio' && objectValue(next.audio)) {
       next = { ...next, audio: { ...objectValue(next.audio), url: ref.url } }

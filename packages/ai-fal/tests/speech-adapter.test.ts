@@ -30,13 +30,7 @@ vi.mock('@fal-ai/client', () => {
 })
 
 // Mock fetch for URL→base64 conversion
-const mockFetchResponse = {
-  ok: true,
-  status: 200,
-  statusText: 'OK',
-  arrayBuffer: () =>
-    Promise.resolve(new Uint8Array([72, 101, 108, 108, 111]).buffer),
-}
+const mockFetchResponse = new Response(new Uint8Array([72, 101, 108, 108, 111]))
 const mockFetch = vi.fn().mockResolvedValue(mockFetchResponse)
 vi.stubGlobal('fetch', mockFetch)
 
@@ -63,7 +57,7 @@ describe('Fal Speech Adapter', () => {
     vi.clearAllMocks()
     mockSubscribe = vi.fn()
     mockConfig = vi.fn()
-    mockFetch.mockResolvedValue(mockFetchResponse)
+    mockFetch.mockImplementation(async () => mockFetchResponse.clone())
   })
 
   it('generates speech with correct API call', async () => {
@@ -196,10 +190,7 @@ describe('Fal Speech Adapter', () => {
     for (let i = 0; i < largeBytes.length; i += 1) {
       largeBytes[i] = i % 256
     }
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      arrayBuffer: () => Promise.resolve(largeBytes.buffer),
-    })
+    mockFetch.mockResolvedValueOnce(new Response(largeBytes))
     mockSubscribe.mockResolvedValueOnce(
       createMockSpeechResponse(
         'https://fal.media/files/large.wav',
@@ -362,4 +353,29 @@ describe('Fal Speech Adapter', () => {
 
     expect(result.usage).toBeUndefined()
   })
+})
+
+it('passes the upstream URL through in uploader mode without downloading', async () => {
+  mockSubscribe = vi
+    .fn()
+    .mockResolvedValue(
+      createMockSpeechResponse('https://fal.media/speech.mp3', 'audio/mpeg'),
+    )
+  mockFetch.mockClear()
+  const uploader = vi.fn()
+  const result = await generateSpeech({
+    adapter: falSpeech('fal-ai/index-tts-2/text-to-speech', {
+      apiKey: 'k',
+      mediaUploader: uploader,
+    }),
+    text: 'Hello',
+    modelOptions: { audio_url: REFERENCE_AUDIO },
+  })
+  expect(result).toMatchObject({
+    audio: '',
+    url: 'https://fal.media/speech.mp3',
+    format: 'mp3',
+  })
+  expect(mockFetch).not.toHaveBeenCalled()
+  expect(uploader).not.toHaveBeenCalled()
 })

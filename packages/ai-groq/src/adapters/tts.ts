@@ -1,10 +1,10 @@
+import { speechMedia, toRunErrorPayload } from '@tanstack/ai/adapter-internals'
+import type { MediaUploader, TTSOptions, TTSResult } from '@tanstack/ai'
 import OpenAI from 'openai'
 import { BaseTTSAdapter } from '@tanstack/ai/adapters'
-import { toRunErrorPayload } from '@tanstack/ai/adapter-internals'
-import { arrayBufferToBase64, generateId } from '@tanstack/ai-utils'
+import { generateId } from '@tanstack/ai-utils'
 import { getGroqApiKeyFromEnv, withGroqDefaults } from '../utils/client'
 import { validateAudioInput } from '../audio/audio-provider-options'
-import type { TTSOptions, TTSResult } from '@tanstack/ai'
 import type OpenAI_SDK from 'openai'
 import type { GroqTTSModel } from '../model-meta'
 import type { GroqTTSProviderOptions } from '../audio/tts-provider-options'
@@ -13,7 +13,9 @@ import type { GroqClientConfig } from '../utils/client'
 /**
  * Configuration for Groq TTS adapter
  */
-export interface GroqTTSConfig extends GroqClientConfig {}
+export interface GroqTTSConfig extends GroqClientConfig {
+  mediaUploader?: MediaUploader
+}
 
 /**
  * Groq Text-to-Speech Adapter
@@ -39,11 +41,14 @@ export class GroqTTSAdapter<TModel extends GroqTTSModel> extends BaseTTSAdapter<
 > {
   readonly name = 'groq' as const
 
+  private readonly mediaUploader: MediaUploader | undefined
   protected client: OpenAI
 
   constructor(config: GroqTTSConfig, model: TModel) {
     super(model, {})
-    this.client = new OpenAI(withGroqDefaults(config))
+    const { mediaUploader, ...clientConfig } = config
+    this.mediaUploader = mediaUploader
+    this.client = new OpenAI(withGroqDefaults(clientConfig))
   }
 
   async generateSpeech(
@@ -72,16 +77,18 @@ export class GroqTTSAdapter<TModel extends GroqTTSModel> extends BaseTTSAdapter<
       )
       const response = await this.client.audio.speech.create(request)
 
-      const arrayBuffer = await response.arrayBuffer()
-      const base64 = arrayBufferToBase64(arrayBuffer)
-
       const outputFormat = request.response_format ?? 'wav'
       const contentType = this.getContentType(outputFormat)
 
       return {
         id: generateId(this.name),
         model,
-        audio: base64,
+        ...(await speechMedia(
+          response,
+          contentType,
+          this.mediaUploader,
+          options.logger,
+        )),
         format: outputFormat,
         contentType,
       }

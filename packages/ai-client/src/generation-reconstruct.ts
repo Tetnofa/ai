@@ -49,16 +49,7 @@ export function reconstructImageResult(
   }
 }
 
-/**
- * tts → `{ id, model, audio: '', format, contentType, artifacts }`.
- *
- * Unlike {@link reconstructAudioResult}, `TTSResult.audio` is a bare base64
- * string with no URL slot, and server-driven persistence never stores the raw
- * bytes — only the durable serve URL on the artifact ref. So the restored
- * result surfaces the audio through `artifacts` (each carrying `url`); consumers
- * play the restored clip from `result.artifacts[0].url` and fall back to the
- * live base64 `audio` only for a just-finished (non-restored) run.
- */
+/** Restore hosted speech from the durable audio artifact URL. */
 export function reconstructSpeechResult(
   restored: GenerationRestoredResult,
 ): TTSResult | null {
@@ -66,14 +57,13 @@ export function reconstructSpeechResult(
     (a) =>
       a.role === 'output' && a.source.mediaType === 'audio' && a.url != null,
   )
-  if (!ref) return null
+  if (!ref?.url) return null
   const contentType = ref.mimeType || undefined
   return {
     id: restored.id ?? '',
     model: restored.model ?? '',
-    // Bytes live in the blob store, served at `ref.url`; the base64 field can't
-    // be rebuilt from the snapshot, so it stays empty on restore.
     audio: '',
+    url: ref.url,
     format: contentType?.split('/')[1] ?? '',
     ...(contentType ? { contentType } : {}),
     artifacts: restored.artifacts,

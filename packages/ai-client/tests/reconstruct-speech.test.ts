@@ -30,10 +30,11 @@ const base: GenerationRestoredResult = {
 }
 
 describe('reconstructSpeechResult', () => {
-  it('rebuilds a TTSResult that surfaces the durable url via artifacts', () => {
+  it('rebuilds a TTSResult that surfaces the durable url for playback', () => {
     const result = reconstructSpeechResult(base)
     expect(result).not.toBeNull()
-    expect(result!.audio).toBe('') // bytes are not persisted; url is in artifacts
+    expect(result!.audio).toBe('')
+    expect(result!.url).toBe('/api/artifacts?id=artifact-speech-1')
     expect(result!.contentType).toBe('audio/mpeg')
     expect(result!.format).toBe('mpeg')
     expect(result!.artifacts?.[0]?.url).toBe(

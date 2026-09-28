@@ -16,6 +16,27 @@ keywords:
 
 TanStack AI provides support for image generation through dedicated image adapters. This guide covers how to use the image generation functionality with OpenAI and Gemini providers.
 
+## Host inline image output
+
+Some image APIs return base64 in their JSON response. Pass `mediaUploader` to OpenAI or Gemini image adapters to store that output:
+
+```typescript
+import { generateImage } from '@tanstack/ai'
+import { openaiImage } from '@tanstack/ai-openai'
+import { mediaUploader } from './storage'
+
+const result = await generateImage({
+  adapter: openaiImage('gpt-image-2.5-flare', { mediaUploader }),
+  prompt: 'A mountain lake at sunrise',
+})
+
+console.log(result.images[0]?.url)
+```
+
+Use the [stream uploader contract](./video-generation#host-downloaded-video) for your storage integration. Uploaded images contain `url` rather than `b64Json`. Revised prompts and usage remain available. Public upstream URLs pass through unchanged.
+
+The SDK already buffers inline base64 responses. Uploading them gives clients a hosted URL, but does not make the provider response streamable. Without an uploader, inline images remain base64.
+
 ## Overview
 
 Image generation is handled by image adapters that follow the same tree-shakeable architecture as other adapters in TanStack AI. The image adapters support:

@@ -1,8 +1,18 @@
 import OpenAI from 'openai'
 import { resolveMediaPrompt } from '@tanstack/ai'
 import { BaseVideoAdapter } from '@tanstack/ai/adapters'
-import { toRunErrorPayload } from '@tanstack/ai/adapter-internals'
-import { arrayBufferToBase64 } from '@tanstack/ai-utils'
+import {
+  toRunErrorPayload,
+  uploadMedia,
+  MEDIA_UPLOADER_REQUIRED,
+} from '@tanstack/ai/adapter-internals'
+import type {
+  MediaUploader,
+  VideoGenerationOptions,
+  VideoJobResult,
+  VideoStatusResult,
+  VideoUrlResult,
+} from '@tanstack/ai'
 import { getOpenAIApiKeyFromEnv } from '../utils/client'
 import { imagePartToFile } from '../image/image-input-to-file'
 import {
@@ -10,12 +20,6 @@ import {
   validateVideoSeconds,
   validateVideoSize,
 } from '../video/video-provider-options'
-import type {
-  VideoGenerationOptions,
-  VideoJobResult,
-  VideoStatusResult,
-  VideoUrlResult,
-} from '@tanstack/ai'
 import type OpenAI_SDK from 'openai'
 import type { OpenAIVideoModel } from '../model-meta'
 import type {
@@ -27,28 +31,13 @@ import type {
 import type { OpenAIClientConfig } from '../utils/client'
 
 /**
- * Threshold for emitting a "this download will probably OOM serverless
- * runtimes" warning. Anything larger than this (in bytes) gets surfaced via
- * console.warn — workers and small isolates routinely run out of memory once
- * a downloaded video is base64-encoded.
- */
-const LARGE_MEDIA_BUFFER_BYTES = 10 * 1024 * 1024
-
-function warnIfLargeMediaBuffer(byteLength: number, source: string): void {
-  if (byteLength <= LARGE_MEDIA_BUFFER_BYTES) return
-  console.warn(
-    `[openai.${source}] downloaded ${(byteLength / 1024 / 1024).toFixed(1)} MiB into memory before base64 encoding. ` +
-      `Workers/serverless runtimes commonly run out of memory above ~10 MiB. ` +
-      `Consider streaming the video through a CDN or your own storage layer instead.`,
-  )
-}
-
-/**
  * Configuration for OpenAI video adapter.
  *
  * @experimental Video generation is an experimental feature and may change.
  */
 export interface OpenAIVideoConfig extends OpenAIClientConfig {
+  /** Store downloaded video bytes and return a public URL. */
+  mediaUploader?: MediaUploader
   /**
    * Opt into fetching HTTP(S) image URL inputs for Sora's `input_reference`.
    * The endpoint requires uploaded file bytes (no URL passthrough), so an
@@ -94,7 +83,11 @@ export class OpenAIVideoAdapter<
     // We hold our own typed copy on `clientConfig` and pass an empty object up.
     super({}, model)
     this.clientConfig = config
-    const { allowUrlFetch: _allowUrlFetch, ...clientOptions } = config
+    const {
+      allowUrlFetch: _allowUrlFetch,
+      mediaUploader: _mediaUploader,
+      ...clientOptions
+    } = config
     this.client = new OpenAI(clientOptions)
   }
 
@@ -243,96 +236,37 @@ export class OpenAIVideoAdapter<
         }
       }
 
-      // SDK download fall-through: try the various possible method names.
-      if (typeof videosClient.downloadContent === 'function') {
-        const contentResponse = await videosClient.downloadContent(jobId)
-        const videoBlob = await contentResponse.blob()
-        const buffer = await videoBlob.arrayBuffer()
-        warnIfLargeMediaBuffer(buffer.byteLength, 'video.downloadContent')
-        const base64 = arrayBufferToBase64(buffer)
-        const mimeType =
-          contentResponse.headers.get('content-type') || 'video/mp4'
-        // Omit `expiresAt` to satisfy exactOptionalPropertyTypes; data URLs do
-        // not have a vendor-provided expiry.
-        return {
-          jobId,
-          url: `data:${mimeType};base64,${base64}`,
-        }
-      }
+      const uploader = this.clientConfig.mediaUploader
+      if (!uploader) return { jobId, url: '', error: MEDIA_UPLOADER_REQUIRED }
 
-      let response: any
-      if (typeof videosClient.content === 'function') {
+      let response: unknown
+      if (typeof videosClient.downloadContent === 'function') {
+        response = await videosClient.downloadContent(jobId)
+      } else if (typeof videosClient.content === 'function') {
         response = await videosClient.content(jobId)
       } else if (typeof videosClient.getContent === 'function') {
         response = await videosClient.getContent(jobId)
       } else if (typeof videosClient.download === 'function') {
         response = await videosClient.download(jobId)
       } else {
-        // Last resort: raw fetch with auth header.
-        const baseUrl = this.clientConfig.baseURL || 'https://api.openai.com/v1'
-        const apiKey = this.clientConfig.apiKey
-
-        const contentResponse = await fetch(
-          `${baseUrl}/videos/${jobId}/content`,
-          { method: 'GET', headers: { Authorization: `Bearer ${apiKey}` } },
+        response = await this.client.get(
+          `/videos/${encodeURIComponent(jobId)}/content`,
+          {
+            headers: { Accept: 'video/mp4' },
+            __binaryResponse: true,
+          },
         )
-
-        if (!contentResponse.ok) {
-          const contentType = contentResponse.headers.get('content-type')
-          if (contentType?.includes('application/json')) {
-            const errorData = await contentResponse.json().catch(() => ({}))
-            throw new Error(
-              errorData.error?.message ||
-                `Failed to get video content: ${contentResponse.status}`,
-            )
-          }
-          throw new Error(
-            `Failed to get video content: ${contentResponse.status}`,
-          )
-        }
-
-        const videoBlob = await contentResponse.blob()
-        const buffer = await videoBlob.arrayBuffer()
-        warnIfLargeMediaBuffer(buffer.byteLength, 'video.fetch')
-        const base64 = arrayBufferToBase64(buffer)
-        const mimeType =
-          contentResponse.headers.get('content-type') || 'video/mp4'
-        return {
-          jobId,
-          url: `data:${mimeType};base64,${base64}`,
-        }
       }
-
-      // The fall-through SDK methods produce a Blob-ish or fetch-`Response`-ish
-      // object. Read as bytes + wrap in a data URL so callers see a playable
-      // URL instead of an endpoint URL.
-      const fallthroughBlob =
-        typeof response?.blob === 'function'
-          ? await response.blob()
-          : response instanceof Blob
-            ? response
-            : null
-      if (!fallthroughBlob) {
+      if (
+        !(response instanceof Response) &&
+        !(response instanceof Blob) &&
+        !(response instanceof ReadableStream)
+      ) {
         throw new Error(
-          `Video content download via SDK fall-through returned an unexpected shape (no blob()).`,
+          'Video content download returned an unexpected shape; expected a Response, Blob, or ReadableStream.',
         )
       }
-      const fallthroughBuffer = await fallthroughBlob.arrayBuffer()
-      warnIfLargeMediaBuffer(
-        fallthroughBuffer.byteLength,
-        'video.sdkFallthrough',
-      )
-      const fallthroughBase64 = arrayBufferToBase64(fallthroughBuffer)
-      const fallthroughMime =
-        (typeof response?.headers?.get === 'function'
-          ? response.headers.get('content-type')
-          : undefined) ||
-        fallthroughBlob.type ||
-        'video/mp4'
-      return {
-        jobId,
-        url: `data:${fallthroughMime};base64,${fallthroughBase64}`,
-      }
+      return { jobId, url: await uploadMedia(response, uploader, 'video/mp4') }
     } catch (error: any) {
       if (error.status === 404) {
         throw new Error(`Video job not found: ${jobId}`)

@@ -1,14 +1,14 @@
+import { speechMedia, toRunErrorPayload } from '@tanstack/ai/adapter-internals'
+import type { MediaUploader, TTSOptions, TTSResult } from '@tanstack/ai'
 import OpenAI from 'openai'
 import { BaseTTSAdapter } from '@tanstack/ai/adapters'
-import { toRunErrorPayload } from '@tanstack/ai/adapter-internals'
-import { arrayBufferToBase64, generateId } from '@tanstack/ai-utils'
+import { generateId } from '@tanstack/ai-utils'
 import { getOpenAIApiKeyFromEnv } from '../utils/client'
 import {
   validateAudioInput,
   validateInstructions,
   validateSpeed,
 } from '../audio/audio-provider-options'
-import type { TTSOptions, TTSResult } from '@tanstack/ai'
 import type OpenAI_SDK from 'openai'
 import type { OpenAITTSModel } from '../model-meta'
 import type { OpenAITTSProviderOptions } from '../audio/tts-provider-options'
@@ -17,7 +17,9 @@ import type { OpenAIClientConfig } from '../utils/client'
 /**
  * Configuration for OpenAI TTS adapter
  */
-export interface OpenAITTSConfig extends OpenAIClientConfig {}
+export interface OpenAITTSConfig extends OpenAIClientConfig {
+  mediaUploader?: MediaUploader
+}
 
 /**
  * OpenAI Text-to-Speech Adapter
@@ -35,11 +37,14 @@ export class OpenAITTSAdapter<
 > extends BaseTTSAdapter<TModel, OpenAITTSProviderOptions> {
   readonly name = 'openai' as const
 
+  private readonly mediaUploader: MediaUploader | undefined
   protected client: OpenAI
 
   constructor(config: OpenAITTSConfig, model: TModel) {
     super(model, {})
-    this.client = new OpenAI(config)
+    const { mediaUploader, ...clientConfig } = config
+    this.mediaUploader = mediaUploader
+    this.client = new OpenAI(clientConfig)
   }
 
   async generateSpeech(
@@ -78,11 +83,6 @@ export class OpenAITTSAdapter<
       )
       const response = await this.client.audio.speech.create(request)
 
-      // Convert response to base64. Buffer is Node-only; use atob fallback in
-      // browser/edge runtimes where the SDK can run.
-      const arrayBuffer = await response.arrayBuffer()
-      const base64 = arrayBufferToBase64(arrayBuffer)
-
       const outputFormat = (request.response_format as string) || 'mp3'
       const contentTypes: Record<string, string> = {
         mp3: 'audio/mpeg',
@@ -97,7 +97,12 @@ export class OpenAITTSAdapter<
       return {
         id: generateId(this.name),
         model,
-        audio: base64,
+        ...(await speechMedia(
+          response,
+          contentType,
+          this.mediaUploader,
+          options.logger,
+        )),
         format: outputFormat,
         contentType,
       }

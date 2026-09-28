@@ -2,7 +2,6 @@ export {
   getFalApiKeyFromEnv,
   configureFalClient,
   generateId,
-  arrayBufferToBase64,
   dataUrlToBlob,
   extractUrlExtension,
   deriveAudioContentType,

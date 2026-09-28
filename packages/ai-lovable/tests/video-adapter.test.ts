@@ -198,3 +198,34 @@ describe('Lovable video adapter', () => {
     expect(mockCreate).not.toHaveBeenCalled()
   })
 })
+
+it('requires an uploader before downloading video, then hands it the stream', async () => {
+  const response = new Response(new Uint8Array([1, 2, 3]), {
+    headers: { 'content-type': 'video/mp4' },
+  })
+  const downloadContent = vi.fn().mockResolvedValue(response)
+  const client = {
+    videos: { retrieve: async () => queuedVideo('job'), downloadContent },
+  }
+  const adapter = createLovableVideo('google/veo-3.1-lite', 'test-key')
+  Object.assign(adapter, { client })
+  expect(await adapter.getVideoUrl('job')).toMatchObject({
+    url: '',
+    error: expect.stringContaining('mediaUploader'),
+  })
+  expect(downloadContent).not.toHaveBeenCalled()
+  const uploader = vi
+    .fn()
+    .mockResolvedValue('https://storage.example/video.mp4')
+  const hosted = createLovableVideo('google/veo-3.1-lite', 'test-key', {
+    mediaUploader: uploader,
+  })
+  Object.assign(hosted, { client })
+  expect((await hosted.getVideoUrl('job')).url).toBe(
+    'https://storage.example/video.mp4',
+  )
+  expect(uploader).toHaveBeenCalledWith({
+    body: response.body,
+    contentType: 'video/mp4',
+  })
+})

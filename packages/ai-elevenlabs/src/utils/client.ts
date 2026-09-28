@@ -1,3 +1,4 @@
+import type { MediaUploader } from '@tanstack/ai'
 import { ElevenLabsClient } from '@elevenlabs/elevenlabs-js'
 import {
   getApiKeyFromEnv,
@@ -11,6 +12,8 @@ import type { ElevenLabsOutputFormat } from '../model-meta'
  * pattern the realtime adapters already use.
  */
 export interface ElevenLabsClientConfig {
+  /** Host generated speech or audio using a stream or Blob. */
+  mediaUploader?: MediaUploader
   apiKey?: string
   /**
    * Base URL for every request. Same option name as the other adapters, so a

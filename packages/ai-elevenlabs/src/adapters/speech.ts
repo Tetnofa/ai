@@ -1,13 +1,6 @@
-import { BaseTTSAdapter } from '@tanstack/ai/adapters'
-import {
-  arrayBufferToBase64,
-  createElevenLabsClient,
-  generateId,
-  parseOutputFormat,
-  readStreamToArrayBuffer,
-} from '../utils/client'
-import type { ElevenLabs, ElevenLabsClient } from '@elevenlabs/elevenlabs-js'
+import { speechMedia, uploadBase64Media } from '@tanstack/ai/adapter-internals'
 import type {
+  MediaUploader,
   CatalogVoice,
   ListVoicesOptions,
   ListVoicesResult,
@@ -18,6 +11,15 @@ import type {
   TTSSegment,
   VoiceOrigin,
 } from '@tanstack/ai'
+import { BaseTTSAdapter } from '@tanstack/ai/adapters'
+import {
+  arrayBufferToBase64,
+  createElevenLabsClient,
+  generateId,
+  parseOutputFormat,
+  readStreamToArrayBuffer,
+} from '../utils/client'
+import type { ElevenLabs, ElevenLabsClient } from '@elevenlabs/elevenlabs-js'
 import type { ElevenLabsClientConfig } from '../utils/client'
 import type { ElevenLabsOutputFormat, ElevenLabsTTSModel } from '../model-meta'
 
@@ -101,10 +103,12 @@ export class ElevenLabsSpeechAdapter<
     timestamps: true,
   }
 
+  private readonly mediaUploader: MediaUploader | undefined
   private readonly client: ElevenLabsClient
 
   constructor(model: TModel, config?: ElevenLabsClientConfig) {
     super(model, config ?? {})
+    this.mediaUploader = config?.mediaUploader
     this.client = createElevenLabsClient(config)
   }
 
@@ -134,6 +138,11 @@ export class ElevenLabsSpeechAdapter<
       const effectiveOutputFormat =
         outputFormat ?? inferOutputFormatFromResponseFormat(options.format)
       const wrapAsWav = outputFormat == null && options.format === 'wav'
+      if (wrapAsWav && this.mediaUploader) {
+        throw new Error(
+          'mediaUploader cannot wrap PCM as WAV without buffering. Use mp3 or an explicit PCM outputFormat.',
+        )
+      }
       const { format, contentType } = wrapAsWav
         ? { format: 'wav', contentType: 'audio/wav' }
         : parseOutputFormat(effectiveOutputFormat)
@@ -176,7 +185,16 @@ export class ElevenLabsSpeechAdapter<
           return {
             id: generateId(this.name),
             model: this.model,
-            audio: encodeAudioBase64(response.audioBase64),
+            ...(this.mediaUploader
+              ? {
+                  audio: '',
+                  url: await uploadBase64Media(
+                    response.audioBase64,
+                    contentType,
+                    this.mediaUploader,
+                  ),
+                }
+              : { audio: encodeAudioBase64(response.audioBase64) }),
             format,
             contentType,
             ...toAlignmentFields(response.alignment, response.voiceSegments),
@@ -187,7 +205,14 @@ export class ElevenLabsSpeechAdapter<
         return {
           id: generateId(this.name),
           model: this.model,
-          audio: encodeAudio(await readStreamToArrayBuffer(stream)),
+          ...(wrapAsWav
+            ? { audio: encodeAudio(await readStreamToArrayBuffer(stream)) }
+            : await speechMedia(
+                stream,
+                contentType,
+                this.mediaUploader,
+                logger,
+              )),
           format,
           contentType,
         }
@@ -225,7 +250,16 @@ export class ElevenLabsSpeechAdapter<
         return {
           id: generateId(this.name),
           model: this.model,
-          audio: encodeAudioBase64(response.audioBase64),
+          ...(this.mediaUploader
+            ? {
+                audio: '',
+                url: await uploadBase64Media(
+                  response.audioBase64,
+                  contentType,
+                  this.mediaUploader,
+                ),
+              }
+            : { audio: encodeAudioBase64(response.audioBase64) }),
           format,
           contentType,
           ...toAlignmentFields(response.alignment, undefined),
@@ -242,7 +276,9 @@ export class ElevenLabsSpeechAdapter<
       return {
         id: generateId(this.name),
         model: this.model,
-        audio: encodeAudio(await readStreamToArrayBuffer(stream)),
+        ...(wrapAsWav
+          ? { audio: encodeAudio(await readStreamToArrayBuffer(stream)) }
+          : await speechMedia(stream, contentType, this.mediaUploader, logger)),
         format,
         contentType,
       }

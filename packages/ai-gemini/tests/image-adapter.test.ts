@@ -1341,3 +1341,49 @@ describe('GEMINI_NATIVE_IMAGE_MODELS public routing list', () => {
     expect(GEMINI_NATIVE_IMAGE_MODELS).toContain('gemini-3.1-flash-image')
   })
 })
+
+it.each(['gemini-3.1-flash-image-preview', 'imagen-4.0-generate-001'] as const)(
+  'uploads %s inline images with their MIME type',
+  async (model) => {
+    const uploader = vi
+      .fn()
+      .mockResolvedValue('https://storage.example/image.webp')
+    const adapter = createGeminiImage(model, 'test-key', {
+      mediaUploader: uploader,
+    })
+    Object.assign(adapter, {
+      client: {
+        models: {
+          generateContent: async () => ({
+            candidates: [
+              {
+                content: {
+                  parts: [
+                    { inlineData: { data: 'AQID', mimeType: 'image/webp' } },
+                  ],
+                },
+              },
+            ],
+          }),
+          generateImages: async () => ({
+            generatedImages: [
+              { image: { imageBytes: 'AQID', mimeType: 'image/webp' } },
+            ],
+          }),
+        },
+      },
+    })
+    const result = await adapter.generateImages({
+      model,
+      prompt: 'A tree',
+      logger: resolveDebugOption(false),
+    })
+    expect(result.images).toEqual([
+      { url: 'https://storage.example/image.webp' },
+    ])
+    expect(uploader).toHaveBeenCalledWith({
+      body: expect.any(Blob),
+      contentType: 'image/webp',
+    })
+  },
+)

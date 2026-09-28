@@ -83,6 +83,7 @@ import { Route as ApiMistralStrictToolNullWireRouteImport } from './routes/api.m
 import { Route as ApiMiddlewareTestRouteImport } from './routes/api.middleware-test'
 import { Route as ApiMessageIdsRouteImport } from './routes/api.message-ids'
 import { Route as ApiMessageHistoryPagingRouteImport } from './routes/api.message-history-paging'
+import { Route as ApiMediaUploadRouteImport } from './routes/api.media-upload'
 import { Route as ApiMcpTypedTestRouteImport } from './routes/api.mcp-typed-test'
 import { Route as ApiMcpTypedServerRouteImport } from './routes/api.mcp-typed-server'
 import { Route as ApiMcpTestRouteImport } from './routes/api.mcp-test'
@@ -521,6 +522,11 @@ const ApiMessageHistoryPagingRoute = ApiMessageHistoryPagingRouteImport.update({
   path: '/api/message-history-paging',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiMediaUploadRoute = ApiMediaUploadRouteImport.update({
+  id: '/api/media-upload',
+  path: '/api/media-upload',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiMcpTypedTestRoute = ApiMcpTypedTestRouteImport.update({
   id: '/api/mcp-typed-test',
   path: '/api/mcp-typed-test',
@@ -851,6 +857,7 @@ export interface FileRoutesByFullPath {
   '/api/mcp-test': typeof ApiMcpTestRoute
   '/api/mcp-typed-server': typeof ApiMcpTypedServerRoute
   '/api/mcp-typed-test': typeof ApiMcpTypedTestRoute
+  '/api/media-upload': typeof ApiMediaUploadRoute
   '/api/message-history-paging': typeof ApiMessageHistoryPagingRoute
   '/api/message-ids': typeof ApiMessageIdsRoute
   '/api/middleware-test': typeof ApiMiddlewareTestRoute
@@ -976,6 +983,7 @@ export interface FileRoutesByTo {
   '/api/mcp-test': typeof ApiMcpTestRoute
   '/api/mcp-typed-server': typeof ApiMcpTypedServerRoute
   '/api/mcp-typed-test': typeof ApiMcpTypedTestRoute
+  '/api/media-upload': typeof ApiMediaUploadRoute
   '/api/message-history-paging': typeof ApiMessageHistoryPagingRoute
   '/api/message-ids': typeof ApiMessageIdsRoute
   '/api/middleware-test': typeof ApiMiddlewareTestRoute
@@ -1102,6 +1110,7 @@ export interface FileRoutesById {
   '/api/mcp-test': typeof ApiMcpTestRoute
   '/api/mcp-typed-server': typeof ApiMcpTypedServerRoute
   '/api/mcp-typed-test': typeof ApiMcpTypedTestRoute
+  '/api/media-upload': typeof ApiMediaUploadRoute
   '/api/message-history-paging': typeof ApiMessageHistoryPagingRoute
   '/api/message-ids': typeof ApiMessageIdsRoute
   '/api/middleware-test': typeof ApiMiddlewareTestRoute
@@ -1229,6 +1238,7 @@ export interface FileRouteTypes {
     | '/api/mcp-test'
     | '/api/mcp-typed-server'
     | '/api/mcp-typed-test'
+    | '/api/media-upload'
     | '/api/message-history-paging'
     | '/api/message-ids'
     | '/api/middleware-test'
@@ -1354,6 +1364,7 @@ export interface FileRouteTypes {
     | '/api/mcp-test'
     | '/api/mcp-typed-server'
     | '/api/mcp-typed-test'
+    | '/api/media-upload'
     | '/api/message-history-paging'
     | '/api/message-ids'
     | '/api/middleware-test'
@@ -1479,6 +1490,7 @@ export interface FileRouteTypes {
     | '/api/mcp-test'
     | '/api/mcp-typed-server'
     | '/api/mcp-typed-test'
+    | '/api/media-upload'
     | '/api/message-history-paging'
     | '/api/message-ids'
     | '/api/middleware-test'
@@ -1605,6 +1617,7 @@ export interface RootRouteChildren {
   ApiMcpTestRoute: typeof ApiMcpTestRoute
   ApiMcpTypedServerRoute: typeof ApiMcpTypedServerRoute
   ApiMcpTypedTestRoute: typeof ApiMcpTypedTestRoute
+  ApiMediaUploadRoute: typeof ApiMediaUploadRoute
   ApiMessageHistoryPagingRoute: typeof ApiMessageHistoryPagingRoute
   ApiMessageIdsRoute: typeof ApiMessageIdsRoute
   ApiMiddlewareTestRoute: typeof ApiMiddlewareTestRoute
@@ -2170,6 +2183,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiMessageHistoryPagingRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/media-upload': {
+      id: '/api/media-upload'
+      path: '/api/media-upload'
+      fullPath: '/api/media-upload'
+      preLoaderRoute: typeof ApiMediaUploadRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/mcp-typed-test': {
       id: '/api/mcp-typed-test'
       path: '/api/mcp-typed-test'
@@ -2651,6 +2671,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiMcpTestRoute: ApiMcpTestRoute,
   ApiMcpTypedServerRoute: ApiMcpTypedServerRoute,
   ApiMcpTypedTestRoute: ApiMcpTypedTestRoute,
+  ApiMediaUploadRoute: ApiMediaUploadRoute,
   ApiMessageHistoryPagingRoute: ApiMessageHistoryPagingRoute,
   ApiMessageIdsRoute: ApiMessageIdsRoute,
   ApiMiddlewareTestRoute: ApiMiddlewareTestRoute,

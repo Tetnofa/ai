@@ -131,22 +131,3 @@ export function dataUrlToBlob(value: string): Blob | undefined {
 
   return new Blob([decodeURIComponent(payload)], { type: mimeType })
 }
-
-/**
- * Convert an ArrayBuffer to base64 in a cross-runtime way.
- *
- * The naive `btoa(String.fromCharCode(...bytes))` form blows up V8's argument
- * limit (~65k) on realistic audio payloads, so we either use `Buffer` (Node /
- * Bun) or walk the byte array in a single loop (browser).
- */
-export function arrayBufferToBase64(bytes: ArrayBuffer): string {
-  if (typeof Buffer !== 'undefined' && typeof Buffer.from === 'function') {
-    return Buffer.from(bytes).toString('base64')
-  }
-  const view = new Uint8Array(bytes)
-  let binary = ''
-  for (const byte of view) {
-    binary += String.fromCharCode(byte)
-  }
-  return btoa(binary)
-}

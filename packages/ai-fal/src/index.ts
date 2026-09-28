@@ -34,6 +34,7 @@ export type {
 // ============================================================================
 
 export { FalSpeechAdapter, falSpeech } from './adapters/speech'
+export type { FalSpeechConfig } from './adapters/speech'
 
 // ============================================================================
 // Transcription Adapter (STT)
