@@ -328,6 +328,7 @@ describe('injectGenerateSpeech', () => {
       id: 'tts-restored',
       model: 'test-tts',
       audio: '',
+      url: artifact.url,
       format: 'mpeg',
       contentType: 'audio/mpeg',
       artifacts: [artifact],

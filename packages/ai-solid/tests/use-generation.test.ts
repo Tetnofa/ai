@@ -888,6 +888,7 @@ describe('useGenerateSpeech', () => {
         id: 'tts-restored',
         model: 'test-tts',
         audio: '',
+        url: restoredSpeechArtifact.url,
         format: 'mpeg',
         contentType: 'audio/mpeg',
         artifacts: [restoredSpeechArtifact],

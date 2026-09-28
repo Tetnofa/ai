@@ -697,7 +697,7 @@ describe('useGenerateSpeech', () => {
   it('restores a completed TTS result from a durable artifact url', async () => {
     // useGenerateSpeech injects `reconstructSpeechResult`. `TTSResult.audio` is
     // a bare base64 string that persistence never stores, so the restored clip
-    // is served from `artifacts[0].url` and `audio` stays empty.
+    // is served from `result.url` and `audio` stays empty.
     const artifact: PersistedArtifactRef = {
       role: 'output',
       artifactId: 'artifact-speech-1',
@@ -747,6 +747,7 @@ describe('useGenerateSpeech', () => {
       id: 'tts-restored',
       model: 'test-tts',
       audio: '',
+      url: artifact.url,
       format: 'mpeg',
       contentType: 'audio/mpeg',
       artifacts: [artifact],
