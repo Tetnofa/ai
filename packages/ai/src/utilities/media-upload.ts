@@ -25,7 +25,16 @@ export async function uploadMedia(
   }
   try {
     const url = await uploader({ body, contentType })
-    if (!/^https?:\/\//i.test(url)) {
+    let parsed: URL
+    try {
+      parsed = new URL(url)
+    } catch {
+      throw new Error('mediaUploader must return a public HTTP(S) URL')
+    }
+    if (
+      /\s/.test(url) ||
+      (parsed.protocol !== 'http:' && parsed.protocol !== 'https:')
+    ) {
       throw new Error('mediaUploader must return a public HTTP(S) URL')
     }
     return url

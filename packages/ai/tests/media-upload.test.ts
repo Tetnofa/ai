@@ -60,13 +60,17 @@ describe('media upload', () => {
       ),
     ).rejects.toThrow('403')
     expect(uploader).not.toHaveBeenCalled()
-    await expect(
-      uploadMedia(
-        new Blob(),
-        async () => 'data:video/mp4;base64,AA==',
-        'video/mp4',
-      ),
-    ).rejects.toThrow('HTTP(S)')
+    for (const url of [
+      'https://',
+      ' https://storage.example/video.mp4 ',
+      'https://storage.example/video clip.mp4',
+      'ftp://storage.example/video.mp4',
+      'data:video/mp4;base64,AA==',
+    ]) {
+      await expect(
+        uploadMedia(new Blob(), async () => url, 'video/mp4'),
+      ).rejects.toThrow('HTTP(S)')
+    }
   })
 
   it('keeps base64 speech by default', async () => {
