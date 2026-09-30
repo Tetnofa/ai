@@ -1,5 +1,11 @@
 # @tanstack/preact-ai-devtools
 
+## 0.1.72
+
+### Patch Changes
+
+- [#1535](https://github.com/TanStack/ai/pull/1535) [`62bec34`](https://github.com/TanStack/ai/commit/62bec34bb78a2f2d0d283c8ea2e9dc39fbd12d2c) - Add Preact v11 to peerDependencies
+
 ## 0.1.71
 
 ### Patch Changes
