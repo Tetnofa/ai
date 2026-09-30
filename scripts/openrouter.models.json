@@ -263,9 +263,9 @@
       "instruct_type": null
     },
     "pricing": {
-      "prompt": "0.00000002",
-      "completion": "0.0000006",
-      "input_cache_read": "0.00000002"
+      "prompt": "0.0000000198",
+      "completion": "0.000000396",
+      "input_cache_read": "0.00000000291"
     },
     "top_provider": {
       "context_length": 1048576,
@@ -329,9 +329,9 @@
       "instruct_type": null
     },
     "pricing": {
-      "prompt": "0.00000015",
+      "prompt": "0.000000123",
       "completion": "0.0000035",
-      "input_cache_read": "0.00000015"
+      "input_cache_read": "0.000000123"
     },
     "top_provider": {
       "context_length": 1048576,
@@ -397,9 +397,9 @@
       "instruct_type": null
     },
     "pricing": {
-      "prompt": "0.00000001",
-      "completion": "0.00000128",
-      "input_cache_read": "0.00000001"
+      "prompt": "0.0000000099",
+      "completion": "0.00000013068",
+      "input_cache_read": "0.000000001386"
     },
     "top_provider": {
       "context_length": 1048576,
@@ -609,8 +609,8 @@
       "instruct_type": null
     },
     "pricing": {
-      "prompt": "0.0000004",
-      "completion": "0.000009",
+      "prompt": "0.0000003654",
+      "completion": "0.0000091343",
       "input_cache_read": "0.0000004"
     },
     "top_provider": {
@@ -1100,7 +1100,7 @@
     },
     "pricing": {
       "prompt": "0.00000002",
-      "completion": "0.0000003",
+      "completion": "0.0000002475",
       "input_cache_read": "0.00000001"
     },
     "top_provider": {
@@ -7596,22 +7596,14 @@
     "supported_parameters": [
       "frequency_penalty",
       "include_reasoning",
-      "logit_bias",
-      "logprobs",
       "max_tokens",
-      "min_p",
-      "presence_penalty",
       "reasoning",
-      "repetition_penalty",
       "response_format",
-      "seed",
-      "stop",
       "structured_outputs",
       "temperature",
       "tool_choice",
       "tools",
       "top_k",
-      "top_logprobs",
       "top_p"
     ],
     "default_parameters": {
@@ -8017,9 +8009,9 @@
       "instruct_type": null
     },
     "pricing": {
-      "prompt": "0.00000095526",
-      "completion": "0.00000191052",
-      "input_cache_read": "0.000000079605"
+      "prompt": "0.000000783",
+      "completion": "0.000001566",
+      "input_cache_read": "0.00000006525"
     },
     "top_provider": {
       "context_length": 1024000,
@@ -8168,9 +8160,9 @@
       "instruct_type": null
     },
     "pricing": {
-      "prompt": "0.00000132",
-      "completion": "0.00000396",
-      "input_cache_read": "0.000000044",
+      "prompt": "0.00000066",
+      "completion": "0.00000198",
+      "input_cache_read": "0.000000022",
       "overrides": [
         {
           "utc_days": ["saturday", "sunday"],
@@ -8288,9 +8280,9 @@
       "instruct_type": null
     },
     "pricing": {
-      "prompt": "0.0000003",
-      "completion": "0.0000012",
-      "input_cache_read": "0.000000006"
+      "prompt": "0.0000000198",
+      "completion": "0.000000396",
+      "input_cache_read": "0.00000000291"
     },
     "top_provider": {
       "context_length": 1048576,
@@ -32862,13 +32854,13 @@
       "instruct_type": null
     },
     "pricing": {
-      "prompt": "0.00000042",
-      "completion": "0.000003",
-      "input_cache_read": "0.000000085"
+      "prompt": "0.0000000249",
+      "completion": "0.00000435",
+      "input_cache_read": "0.0000000199"
     },
     "top_provider": {
-      "context_length": 1000000,
-      "max_completion_tokens": 131072,
+      "context_length": 262144,
+      "max_completion_tokens": 235929,
       "is_moderated": false
     },
     "per_request_limits": null,
@@ -34431,7 +34423,23 @@
     "pricing": {
       "prompt": "0.000000834",
       "completion": "0.000002501",
-      "input_cache_read": "0.000000042"
+      "input_cache_read": "0.000000042",
+      "overrides": [
+        {
+          "utc_start": 0,
+          "utc_end": 1600,
+          "prompt": "0.000000834",
+          "completion": "0.000002501",
+          "input_cache_read": "0.000000042"
+        },
+        {
+          "utc_start": 1600,
+          "utc_end": 0,
+          "prompt": "0.0000007506",
+          "completion": "0.0000022509",
+          "input_cache_read": "0.0000000378"
+        }
+      ]
     },
     "top_provider": {
       "context_length": 1048576,
@@ -36902,7 +36910,7 @@
     "name": "Xiaomi: MiMo-V2.6-Flash",
     "created": 1790021264,
     "description": "MiMo-V2.6-Flash is an open-source foundation model developed by Xiaomi. Built on a Mixture-of-Experts architecture with 309B total parameters and 15B activated per token, it employs a hybrid attention mechanism for...",
-    "context_length": 1048576,
+    "context_length": 1050000,
     "architecture": {
       "modality": "text+image+audio+video->text",
       "input_modalities": ["text", "image", "video", "audio"],
@@ -38396,7 +38404,7 @@
       "instruct_type": null
     },
     "pricing": {
-      "prompt": "0.00000036",
+      "prompt": "0.00000041",
       "completion": "0.00000399",
       "input_cache_read": "0.00000026"
     },

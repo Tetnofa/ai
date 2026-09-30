@@ -156,11 +156,11 @@ const _DEEPSEEK_DEEPSEEK_FLASH_LATEST = {
   pricing: {
     text: {
       input: {
-        normal: 0.02,
-        cached: 0.02,
+        normal: 0.0198,
+        cached: 0.00291,
       },
       output: {
-        normal: 0.6,
+        normal: 0.396,
       },
     },
     image: 0,
@@ -193,8 +193,8 @@ const _DEEPSEEK_DEEPSEEK_PRO_LATEST = {
   pricing: {
     text: {
       input: {
-        normal: 0.15,
-        cached: 0.15,
+        normal: 0.123,
+        cached: 0.123,
       },
       output: {
         normal: 3.5,
@@ -231,11 +231,11 @@ const _DEEPSEEK_DEEPSEEK_V4_FLASH_LATEST = {
   pricing: {
     text: {
       input: {
-        normal: 0.01,
-        cached: 0.01,
+        normal: 0.0099,
+        cached: 0.001386,
       },
       output: {
-        normal: 1.28,
+        normal: 0.13068,
       },
     },
     image: 0,
@@ -332,11 +332,11 @@ const _MOONSHOTAI_KIMI_LATEST = {
   pricing: {
     text: {
       input: {
-        normal: 0.4,
+        normal: 0.3654,
         cached: 0.4,
       },
       output: {
-        normal: 9,
+        normal: 9.1343,
       },
     },
     image: 0,
@@ -557,7 +557,7 @@ const _Z_AI_GLM_FLASH_LATEST = {
         cached: 0.01,
       },
       output: {
-        normal: 0.3,
+        normal: 0.2475,
       },
     },
     image: 0,
@@ -2579,17 +2579,11 @@ const DEEPSEEK_DEEPSEEK_V3_2_EXP = {
     output: ['text'],
     supports: [
       'frequencyPenalty',
-      'logitBias',
-      'logprobs',
       'maxCompletionTokens',
-      'presencePenalty',
       'reasoning',
       'responseFormat',
-      'seed',
-      'stop',
       'temperature',
       'toolChoice',
-      'topLogprobs',
       'topP',
     ],
   },
@@ -2749,11 +2743,11 @@ const DEEPSEEK_DEEPSEEK_V4_PRO = {
   pricing: {
     text: {
       input: {
-        normal: 0.95526,
-        cached: 0.079605,
+        normal: 0.783,
+        cached: 0.06525,
       },
       output: {
-        normal: 1.91052,
+        normal: 1.566,
       },
     },
     image: 0,
@@ -2786,11 +2780,11 @@ const DEEPSEEK_DEEPSEEK_V4_PRO_0813 = {
   pricing: {
     text: {
       input: {
-        normal: 1.32,
-        cached: 0.044,
+        normal: 0.66,
+        cached: 0.022,
       },
       output: {
-        normal: 3.96,
+        normal: 1.98,
       },
     },
     image: 0,
@@ -2823,11 +2817,11 @@ const DEEPSEEK_DEEPSEEK_V4_1_FLASH = {
   pricing: {
     text: {
       input: {
-        normal: 0.3,
-        cached: 0.006,
+        normal: 0.0198,
+        cached: 0.00291,
       },
       output: {
-        normal: 1.2,
+        normal: 0.396,
       },
     },
     image: 0,
@@ -12482,15 +12476,15 @@ const QWEN_QWEN3_8_27B = {
     ],
   },
   context_window: 1000000,
-  max_output_tokens: 131072,
+  max_output_tokens: 235929,
   pricing: {
     text: {
       input: {
-        normal: 0.42,
-        cached: 0.085,
+        normal: 0.0249,
+        cached: 0.0199,
       },
       output: {
-        normal: 3,
+        normal: 4.35,
       },
     },
     image: 0,
@@ -14079,7 +14073,7 @@ const XIAOMI_MIMO_V2_6_FLASH = {
       'topP',
     ],
   },
-  context_window: 1048576,
+  context_window: 1050000,
   max_output_tokens: 131072,
   pricing: {
     text: {
@@ -14531,7 +14525,7 @@ const Z_AI_GLM_5_2 = {
   pricing: {
     text: {
       input: {
-        normal: 0.36,
+        normal: 0.41,
         cached: 0.26,
       },
       output: {
@@ -15722,17 +15716,11 @@ export type OpenRouterModelOptionsByName = {
     Pick<
       OpenRouterBaseOptions,
       | 'frequencyPenalty'
-      | 'logitBias'
-      | 'logprobs'
       | 'maxCompletionTokens'
-      | 'presencePenalty'
       | 'reasoning'
       | 'responseFormat'
-      | 'seed'
-      | 'stop'
       | 'temperature'
       | 'toolChoice'
-      | 'topLogprobs'
       | 'topP'
     >
   [DEEPSEEK_DEEPSEEK_V4_FLASH.id]: OpenRouterCommonOptions &
